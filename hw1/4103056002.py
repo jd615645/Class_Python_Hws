@@ -2,8 +2,7 @@
 from __future__ import print_function
 from colorclass import Color, Windows
 from terminaltables import SingleTable
-import os, random, re
-import curses
+import os, random, re, time
 
 maxItem = 0
 gameBoard = []
@@ -136,7 +135,7 @@ def inputCoordinate():
     coordinate = check.group().split(',')
     row = int(coordinate[0])
     col = int(coordinate[1])
-    if (row<1 or row>maxItem-1 or col<1 or col>maxItem-1 ):
+    if (row<1 or row>9 or col<1 or col>9 ):
       return False
     else:
       return [row, col]
@@ -209,6 +208,9 @@ def dropDown():
           for dropRow in range(row, 0, -1):
             gameBoard[dropRow][col] = gameBoard[dropRow-1][col]
           gameBoard[0][col] = random.randint(0, maxItem-1)
+          time.sleep(.5)
+          os.system('clear')
+          drawTable()
         else:
           break
 
@@ -229,9 +231,9 @@ def main():
 
   haveError = False
 
-
-
   while (rounds>0):
+    time.sleep(.5)
+    os.system('clear')
     drawTable()
     showPoint(points, rounds)
     if (haveError):
@@ -251,7 +253,11 @@ def main():
     moveTo = moveCoordinate(coordinate, move)
 
     swap(coordinate, moveTo)
+
+    os.system('clear')
     drawTable()
+    time.sleep(.5)
+
     haveLine = checkHaveLine()
 
     if (haveLine):
