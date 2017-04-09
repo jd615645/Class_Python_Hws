@@ -224,7 +224,16 @@ def swap(coordinate, moveToCoordinate):
 
 def main():
   global maxItem 
-  maxItem = input('想要幾種顏色(3-26)？')
+  while (1):
+    try:
+      maxItem = input('想要幾種顏色(3-26)？')
+      if ((type(maxItem) is int) and maxItem>=3):
+        break
+      else:
+        print('請按照格式輸入')
+    except:
+      print('請按照格式輸入')
+  
   rounds = 20
   points = 0
   initTable()
