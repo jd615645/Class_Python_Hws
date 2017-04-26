@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 from __future__ import print_function
 import select, random, json, os, socket
-from Tkinter import *
 
 # 0 => join game
 # 1 => wait start
