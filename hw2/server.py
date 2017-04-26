@@ -4,7 +4,6 @@ import select, random, json, os, socket
 
 poker = []
 pokerUsed = 0
-playerLimit = 4
 
 def broadcast_data (sock, message):
   for socket in CONNECTION_LIST:
@@ -14,6 +13,34 @@ def broadcast_data (sock, message):
       except :
         socket.close()
         CONNECTION_LIST.remove(socket)
+
+def checkPoker(num):
+  pokerNum = num % 13
+  pokerNumSign = ''
+
+  if (pokerNum == 11):
+    pokerNumSign = 'J'
+  elif (pokerNum == 12):
+    pokerNumSign = 'Q'
+  elif (pokerNum == 0):
+    pokerNumSign = 'K'
+  else:
+    pokerNumSign = str(pokerNum)
+
+  pokerType = ''
+  pokerTypeCalc = num / 13
+  if (pokerTypeCalc == 0):
+    pokerType = u'♠ '
+  elif (pokerTypeCalc == 1):
+    pokerType = u'♥ '
+  elif (pokerTypeCalc == 2):
+    pokerType = u'♦ '
+  elif (pokerTypeCalc >= 3):
+    pokerType = u'♣ '
+  
+  sign = pokerType + pokerNumSign
+
+  return sign
 
 class Player:
   def __init__(self, cards, points, safe):
@@ -28,8 +55,6 @@ class Player:
     global pokerUsed
     if (self.safe):
       self.cards.append(poker[pokerUsed])
-
-      getPoker = poker[pokerUsed]
       pokerUsed += 1
 
       self.calcPoint()
@@ -50,12 +75,14 @@ class Player:
       if (pokerNum >= 10):
         totNum += 10
       elif (pokerNum == 1):
-        if (totNum+11 > 21):
-          totNum += 1
-        else:
-          totNum += 11
+        totNum += 11
       else:
         totNum += pokerNum
+    
+    for num in self.cards:
+      if (totNum > 21 and (num % 13) == 1):
+        totNum -= 10
+      
     self.points = totNum
 
   def getData(self):
@@ -65,7 +92,9 @@ class Player:
     }
 
 def shuffle():
+  global pokerUsed, poker
   pokerUsed = 0
+  poker = []
   for i in range(1, 53):
     poker.append(i)
 
@@ -91,12 +120,16 @@ if __name__ == '__main__':
   # Add server socket to the list of readable connections
   CONNECTION_LIST.append(server_socket)
 
-
-  print('Chat server started on port ' + str(PORT))
+  print('server started on port ' + str(PORT))
   players = []
   ready = 0
   whoPlay = 1
   start = False
+
+  # creat banker
+  players.append(Player([], 0, True))
+
+  
   while 1:
     # Get the list sockets which are ready to be read through select
     read_sockets,write_sockets,error_sockets = select.select(CONNECTION_LIST,[],[])
@@ -108,82 +141,91 @@ if __name__ == '__main__':
         sockfd, addr = server_socket.accept()
         CONNECTION_LIST.append(sockfd)
 
-        print('Client (%s, %s) connected' % addr)
-        if (len(players) <= 5):
-          sockfd.send(str(len(players)))
+        # print('Client (%s, %s) connected' % addr)
+        playerID = len(players)
+        if (playerID <= 3):
+          sockfd.send(str(playerID))
           players.append(Player([], 0, True))
-
-        # broadcast_data(sockfd, '[%s:%s] entered roomn\n' % addr)
 
       #Some incoming message from a client
       else:
         # Data recieved from client, process it
         try:
-          # In Windows, sometimes when a TCP program closes abruptly,
-          # a 'Connection reset by peer' exception will be thrown
+          # In Windows, sometimes when a TCP program closes abruptly, a 'Connection reset by peer' exception will be thrown
           data = sock.recv(RECV_BUFFER)
 
           if data:
-            print('data: ' + data)
-
             if (data == 'ready'):
               ready += 1
 
-            if (len(players) == ready and ready > 1 and (not start)):
+            if (len(players)-1 == ready and (not start)):
               shuffle()
-              broadcast_data(sock, 'start')
               for player in players:
                 for i in range(2):
                   player.hit()
               start = True
-              print('whoPlay: ' + str(whoPlay))
+              broadcast_data(sock, 'start')
 
             if (data == 'hit'):
-              if (players[whoPlay].safe):
-                print('hit')
-                players[whoPlay].hit()
-                data = 'sendData'
-              else:
-                print('stand')
-                data = 'stand'
-            
+              players[whoPlay].hit()
+              data = 'sendData'
+
             if (data == 'stand'):
-              if (whoPlay ==0):
-                # use endGame fun
+              whoPlay += 1
+              # banker turn
+              if (whoPlay > len(players)-1):
+                while True:
+                  if (players[0].points < 17):
+                    players[0].hit()
+                  else:
+                    break
                 data = 'endGame'
               else:
-                whoPlay += 1
-                if (whoPlay > len(players)-1):
-                  whoPlay = 0
                 broadcast_data(sock, str(whoPlay))
                 data = 'sendData'
             
             if (data == 'sendData'):
-              print('sendData')
               sendData = []
               for player in players:
                 sendData.append(player.getData())
-              print(str(sendData))
-              broadcast_data(sock, str(sendData))
+              # print(json.dumps(sendData))
+              broadcast_data(sock, json.dumps(sendData))
 
             if (data == 'endGame'):
+              broadcast_data(sock, 'gameover')
               print('---遊戲結果---')
               pointList = []
+              
+              playerNum = 0
               for player in players:
-                if (player.points > 21):
+                cards = player.cards
+                points = player.points
+                if (playerNum == 0):
+                  print('Banker Point ', str(points))
+                else:
+                  print('Player' + str(playerNum) + ' Point ', str(points))
+                for num in cards:
+                  print(checkPoker(num), end='')
+                print('')
+
+                if (points > 21):
                   pointList.append(0)
                 else:
-                  pointList.append(player.points)
+                  pointList.append(points)
+                playerNum += 1
+
               bankerPoint = pointList[0]
               playerNum = 1
+              print('')
+
               for point in range(1, len(pointList)):
-                if (bankerPoint >= point):
-                  print('Player' + playerNum + 'vs 莊家 莊家勝利')
+                if (bankerPoint >= pointList[point]):
+                  print('Player ' + str(playerNum) + ' vs 莊家 莊家勝利')
                 else:
-                  print('Player' + playerNum + 'vs 莊家 Player' + playerNum + '勝利')
+                  print('Player' + str(playerNum) + ' vs 莊家 Player' + playerNum + '勝利')
                 playerNum += 1
+              print('請重開連線重新開始')
               print('--------------')
-                
 
         except:
           broadcast_data(sock, 'Client (%s, %s) is offline' % addr)
