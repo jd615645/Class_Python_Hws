@@ -103,6 +103,6 @@ if __name__ == '__main__':
   knn2('龍潭', '2015/01/01', 5)
   siteName = raw_input('請輸入地區: ')
   date = raw_input('請輸入日期(ex: 2015/01/01): ')
-  k = raw_input('請輸入k值: ')
+  k = int(raw_input('請輸入k值: '))
   knn1(siteName, date, k)
   knn2(siteName, date, k)
